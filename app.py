@@ -1,4 +1,5 @@
 import os
+import csv
 from datetime import datetime
 
 import numpy as np
@@ -18,6 +19,9 @@ BASE_DIR = os.path.dirname(__file__)
 GDRIVE_FILE_ID = "1MUeTJdagltmtkKV6ttdBzOcXsB3RiazU"
 MODEL_URL = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
 MODEL_PATH = os.path.join(BASE_DIR, "model_blood_group_detection_fusion.h5")
+
+# history file
+HISTORY_CSV = os.path.join(BASE_DIR, "prediction_history.csv")
 
 # class labels
 CLASS_LABELS = ['A+', 'A-', 'AB+', 'AB-', 'B+', 'B-', 'O+', 'O-']
@@ -68,12 +72,31 @@ def preprocess_lenet(pil_img):
     return arr
 
 # -----------------------
+# History helpers
+# -----------------------
+def log_prediction(user, timestamp, label, confidence_pct):
+    """Append one prediction entry to a CSV file."""
+    file_exists = os.path.exists(HISTORY_CSV)
+    with open(HISTORY_CSV, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["user", "timestamp", "prediction", "confidence_percent"])
+        writer.writerow([user, timestamp, label, confidence_pct])
+
+def load_history():
+    """Read prediction history from CSV as list of dicts."""
+    if not os.path.exists(HISTORY_CSV):
+        return []
+    with open(HISTORY_CSV, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        return list(reader)
+
+# -----------------------
 # Streamlit UI
 # -----------------------
 st.set_page_config(page_title="Blood Group Detection", page_icon="🩸")
 st.title("🩸 Blood Group Detection – ResNet50 + LeNet Fusion")
 
-# user name input
 username = st.text_input("User name", value="")
 
 st.write("Upload a blood smear image to predict the **blood group** using the fusion CNN model.")
@@ -95,13 +118,29 @@ if uploaded_file is not None:
             confidence = float(np.max(preds))
 
         predicted_label = CLASS_LABELS[idx]
-
-        # build report info
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         display_name = username.strip() or "Anonymous"
+        confidence_pct = round(confidence * 100, 2)
 
+        # show report
         st.subheader("BloodPrint Prediction Report")
         st.write(f"**User:** {display_name}")
         st.write(f"**Date/Time:** {timestamp}")
         st.write(f"**Prediction:** {predicted_label}")
-        st.write(f"**Confidence:** {confidence * 100:.2f}%")
+        st.write(f"**Confidence:** {confidence_pct:.2f}%")
+
+        # save to history
+        log_prediction(display_name, timestamp, predicted_label, confidence_pct)
+        st.info("✅ Prediction saved to history.")
+
+# -----------------------
+# History button
+# -----------------------
+if st.button("Show prediction history"):
+    history = load_history()
+    if not history:
+        st.warning("No predictions have been made yet.")
+    else:
+        st.subheader("Prediction History")
+        st.write(f"Total predictions: **{len(history)}**")
+        st.table(history)
