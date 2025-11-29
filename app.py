@@ -71,7 +71,8 @@ st.title("🩸 Blood Group Detection – ResNet50 + LeNet Fusion")
 
 st.write("Upload a blood smear image to predict the **blood group** using the fusion CNN model.")
 
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png", "bmp"])
+
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -90,3 +91,4 @@ if uploaded_file is not None:
         predicted_label = CLASS_LABELS[idx]
         st.success(f"Predicted blood group: **{predicted_label}**")
         st.write(f"Confidence: **{confidence * 100:.2f}%**")
+
