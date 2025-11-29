@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+
 import numpy as np
 import streamlit as st
 import tensorflow as tf
@@ -27,8 +29,10 @@ LENET_IMG_SIZE = (32, 32)
 # -----------------------
 def squeeze_excite_block(input_tensor, ratio=16):
     filters = input_tensor.shape[-1]
-    se = Dense(filters // ratio, activation="relu", kernel_initializer="he_normal", use_bias=False)(input_tensor)
-    se = Dense(filters, activation="sigmoid", kernel_initializer="he_normal", use_bias=False)(se)
+    se = Dense(filters // ratio, activation="relu",
+               kernel_initializer="he_normal", use_bias=False)(input_tensor)
+    se = Dense(filters, activation="sigmoid",
+               kernel_initializer="he_normal", use_bias=False)(se)
     x = Multiply()([input_tensor, se])
     return x
 
@@ -69,10 +73,12 @@ def preprocess_lenet(pil_img):
 st.set_page_config(page_title="Blood Group Detection", page_icon="🩸")
 st.title("🩸 Blood Group Detection – ResNet50 + LeNet Fusion")
 
+# user name input
+username = st.text_input("User name", value="")
+
 st.write("Upload a blood smear image to predict the **blood group** using the fusion CNN model.")
 
 uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png", "bmp"])
-
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -89,6 +95,13 @@ if uploaded_file is not None:
             confidence = float(np.max(preds))
 
         predicted_label = CLASS_LABELS[idx]
-        st.success(f"Predicted blood group: **{predicted_label}**")
-        st.write(f"Confidence: **{confidence * 100:.2f}%**")
 
+        # build report info
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        display_name = username.strip() or "Anonymous"
+
+        st.subheader("BloodPrint Prediction Report")
+        st.write(f"**User:** {display_name}")
+        st.write(f"**Date/Time:** {timestamp}")
+        st.write(f"**Prediction:** {predicted_label}")
+        st.write(f"**Confidence:** {confidence * 100:.2f}%")
