@@ -15,8 +15,12 @@ import json
 from difflib import get_close_matches
 
 # Load predefined Q&A
-with open("qa_data.json", "r", encoding="utf-8") as f:
-    QA_DATA = json.load(f)
+try:
+    with open("qa_data.json", "r", encoding="utf-8") as f:
+        QA_DATA = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    QA_DATA = {}
+
 
 def find_local_answer(question: str):
     q = question.lower().strip()
@@ -317,6 +321,7 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
 
 
 
