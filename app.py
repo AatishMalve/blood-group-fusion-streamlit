@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pytz
 import streamlit as st
-import requests  # <-- use REST API instead of google-generativeai
+import requests  # use REST API instead of google-generativeai
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
@@ -15,9 +15,8 @@ import gdown
 # -----------------------
 # Gemini / Google API Key
 # -----------------------
-# ⛔ IMPORTANT: regenerate a new key in Google AI Studio
-# and DO NOT commit it to GitHub or share it.
-GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
+# ⛔ IMPORTANT: put your real key here, but don't share it publicly.
+GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -69,6 +68,7 @@ def ask_gemini(question: str) -> str:
     except Exception as e:
         return f"Error talking to Gemini API: {e}"
 
+
 # -----------------------
 # Paths and Google Drive model
 # -----------------------
@@ -99,6 +99,7 @@ def squeeze_excite_block(input_tensor, ratio=16):
     x = Multiply()([input_tensor, se])
     return x
 
+
 @st.cache_resource
 def load_model():
     # download once if missing
@@ -112,6 +113,7 @@ def load_model():
     )
     return model
 
+
 cnn_model = load_model()
 
 # -----------------------
@@ -124,11 +126,13 @@ def preprocess_resnet(pil_img):
     arr = np.expand_dims(arr, axis=0)
     return arr
 
+
 def preprocess_lenet(pil_img):
     img = pil_img.convert("RGB").resize(LENET_IMG_SIZE)
     arr = np.array(img).astype("float32") / 255.0
     arr = np.expand_dims(arr, axis=0)
     return arr
+
 
 # -----------------------
 # History helpers
@@ -142,6 +146,7 @@ def log_prediction(user, timestamp, label, confidence_pct):
             writer.writerow(["user", "timestamp", "prediction", "confidence_percent"])
         writer.writerow([user, timestamp, label, confidence_pct])
 
+
 def load_history():
     """Read prediction history from CSV as list of dicts."""
     if not os.path.exists(HISTORY_CSV):
@@ -149,6 +154,7 @@ def load_history():
     with open(HISTORY_CSV, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         return list(reader)
+
 
 # -----------------------
 # Streamlit UI
@@ -177,8 +183,10 @@ if uploaded_file is not None:
             confidence = float(np.max(preds))
 
         predicted_label = CLASS_LABELS[idx]
+
         ist = pytz.timezone("Asia/Kolkata")
-timestamp = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+
         display_name = username.strip() or "Anonymous"
         confidence_pct = round(confidence * 100, 2)
 
@@ -220,6 +228,3 @@ if st.button("Get AI Response"):
         with st.spinner("Contacting Gemini..."):
             answer = ask_gemini(user_question)
         st.write(answer)
-
-
-
