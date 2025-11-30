@@ -12,30 +12,37 @@ from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
 import gdown
 import json
+import re
 from difflib import get_close_matches
 
 # ==========================
 # Load predefined Q&A (JSON)
 # ==========================
+
+def clean_text(t: str) -> str:
+    """Lowercase, remove punctuation, trim spaces."""
+    return re.sub(r"[^\w\s]", "", t.lower()).strip()
+
 try:
     with open("qa_data.json", "r", encoding="utf-8") as f:
         raw_data = json.load(f)
-        # normalize keys to lowercase + strip spaces
-        QA_DATA = {k.lower().strip(): v for k, v in raw_data.items()}
+        # normalize keys to cleaned form
+        QA_DATA = {clean_text(k): v for k, v in raw_data.items()}
 except (FileNotFoundError, json.JSONDecodeError):
     QA_DATA = {}
 
 
 def find_local_answer(question: str):
     """Try to answer from local JSON first (exact + fuzzy)."""
-    q = question.lower().strip()
+    q = clean_text(question)
 
     # Exact match
     if q in QA_DATA:
         return QA_DATA[q]
 
-    # Fuzzy close match (more tolerant cutoff)
-    matches = get_close_matches(q, QA_DATA.keys(), n=1, cutoff=0.4)
+    # Fuzzy close match – similar but not too loose
+    keys = list(QA_DATA.keys())
+    matches = get_close_matches(q, keys, n=1, cutoff=0.7)
     if matches:
         return QA_DATA[matches[0]]
 
@@ -46,7 +53,7 @@ def find_local_answer(question: str):
 # GEMINI API CONFIG
 # ==========================
 # ⚠️ Put your own valid Gemini API key here. Don't commit real keys to public repos.
-GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
+GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -88,12 +95,11 @@ def ask_gemini(question: str) -> str:
         if not parts:
             return "No response from Gemini (no content parts)."
         return parts[0].get("text", "Gemini returned no text.")
-    except Exception as e:
+    except Exception:
         # Graceful fallback if Gemini fails
         return (
             "I couldn’t contact the Gemini service right now. "
-            "Please try again later or ask a different question.\n\n"
-            f"(Technical detail: {e})"
+            "Please try again later or ask another question from the knowledge base."
         )
 
 
@@ -353,4 +359,3 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
-
