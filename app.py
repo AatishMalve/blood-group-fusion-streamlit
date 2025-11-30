@@ -4,7 +4,7 @@ from datetime import datetime
 
 import numpy as np
 import streamlit as st
-import google.generativeai as genai
+import requests  # <-- use REST API instead of google-generativeai
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
@@ -14,9 +14,58 @@ import gdown
 # -----------------------
 # Gemini / Google API Key
 # -----------------------
-# ⛔ Don't commit your real key to GitHub or share it publicly.
+# ⛔ IMPORTANT: regenerate a new key in Google AI Studio
+# and DO NOT commit it to GitHub or share it.
 GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
-genai.configure(api_key=GOOGLE_API_KEY)
+
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-1.5-flash:generateContent"
+)
+
+def ask_gemini(question: str) -> str:
+    """Call Gemini API using HTTP POST and return the text reply."""
+    if not GOOGLE_API_KEY:
+        return "Gemini API key is not configured."
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GOOGLE_API_KEY,
+    }
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": (
+                            "You are an AI assistant helping with questions about blood groups, "
+                            "blood smear analysis, and interpreting blood group prediction results. "
+                            "Explain things in simple, clear language.\n\n"
+                            f"User question: {question}"
+                        )
+                    }
+                ]
+            }
+        ]
+    }
+
+    try:
+        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return "No response from Gemini (no candidates)."
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "No response from Gemini (no content parts)."
+
+        return parts[0].get("text", "Gemini returned no text.")
+    except Exception as e:
+        return f"Error talking to Gemini API: {e}"
 
 # -----------------------
 # Paths and Google Drive model
@@ -61,7 +110,7 @@ def load_model():
     )
     return model
 
-cnn_model = load_model()  # renamed from "model" to avoid confusion with Gemini model
+cnn_model = load_model()
 
 # -----------------------
 # Preprocessing helpers
@@ -165,15 +214,6 @@ if st.button("Get AI Response"):
     if not user_question.strip():
         st.warning("Please enter a question before asking.")
     else:
-        try:
-            gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-            prompt = (
-                "You are an AI assistant helping with questions about blood groups, "
-                "blood smear analysis, and interpreting blood group prediction results. "
-                "Explain things in simple, clear language.\n\n"
-                f"User question: {user_question}"
-            )
-            response = gemini_model.generate_content(prompt)
-            st.write(response.text)
-        except Exception as e:
-            st.error(f"Error while contacting Gemini API: {e}")
+        with st.spinner("Contacting Gemini..."):
+            answer = ask_gemini(user_question)
+        st.write(answer)
