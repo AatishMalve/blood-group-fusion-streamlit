@@ -5,4 +5,4 @@ numpy
 gdown
 requests
 pytz
-
+fpdf2
