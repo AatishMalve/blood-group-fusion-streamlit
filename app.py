@@ -177,7 +177,8 @@ if uploaded_file is not None:
             confidence = float(np.max(preds))
 
         predicted_label = CLASS_LABELS[idx]
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ist = pytz.timezone("Asia/Kolkata")
+timestamp = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
         display_name = username.strip() or "Anonymous"
         confidence_pct = round(confidence * 100, 2)
 
@@ -219,5 +220,6 @@ if st.button("Get AI Response"):
         with st.spinner("Contacting Gemini..."):
             answer = ask_gemini(user_question)
         st.write(answer)
+
 
 
