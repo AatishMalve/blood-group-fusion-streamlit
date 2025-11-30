@@ -195,7 +195,7 @@ with tab_predict:
                 unsafe_allow_html=True
             )
 
-    if st.session_state["last_report"]:
+        if st.session_state["last_report"]:
         rep = st.session_state["last_report"]
 
         pdf = FPDF()
@@ -210,9 +210,18 @@ with tab_predict:
         pdf.cell(0, 8, f"Confidence: {rep['confidence']}%", ln=True)
 
         pdf_out = pdf.output(dest="S")
-        pdf_data = pdf_out.encode("latin-1") if isinstance(pdf_out, str) else pdf_out
+        if isinstance(pdf_out, str):
+            pdf_bytes = pdf_out.encode("latin-1")
+        else:
+            pdf_bytes = bytes(pdf_out)
 
-        st.download_button("📄 Download PDF Report", pdf_data, "report.pdf", "application/pdf")
+        st.download_button(
+            "📄 Download PDF Report",
+            pdf_bytes,
+            "report.pdf",
+            "application/pdf"
+        )
+
 
 
 # ---------- History Tab ----------
@@ -246,4 +255,5 @@ with tab_chat:
             st.rerun()
         else:
             st.warning("Enter a question first!")
+
 
