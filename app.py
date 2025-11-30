@@ -4,6 +4,10 @@ from datetime import datetime
 
 import numpy as np
 import streamlit as st
+import google.generativeai as genai
+
+GOOGLE_API_KEY = "YOUR_NEW_VALID_API_KEY_HERE"
+genai.configure(AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc)
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
@@ -144,3 +148,4 @@ if st.button("Show prediction history"):
         st.subheader("Prediction History")
         st.write(f"Total predictions: **{len(history)}**")
         st.table(history)
+
