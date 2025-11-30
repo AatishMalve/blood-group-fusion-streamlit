@@ -16,7 +16,7 @@ from fpdf import FPDF
 # ==========================
 # GEMINI API CONFIG
 # ==========================
-GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"   # Replace with your new valid key
+GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"   # Replace with your new valid key
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -246,3 +246,4 @@ with tab_chat:
             st.rerun()
         else:
             st.warning("Enter a question first!")
+
