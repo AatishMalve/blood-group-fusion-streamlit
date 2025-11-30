@@ -1,7 +1,12 @@
 {
-  "what is blood transfusion": "Blood transfusion is a medical procedure where donated blood is given to a patient through an IV line to replace lost components like red cells, plasma or platelets.",
-  "difference between a+ and a- blood": "A+ blood has the Rh antigen on red blood cells, while A- does not. A+ can receive from A+, A-, O+, O-; A- can receive only from A- and O-.",
-  "what is hemoglobin": "Hemoglobin is a protein in red blood cells that carries oxygen from the lungs to the body tissues."
-  "types of blood groups": "There are 8 common blood groups in the ABO and Rh classification: A+, A-, B+, B-, AB+, AB-, O+, O-."
-
+  "what is blood transfusion": "Blood transfusion is a medical procedure where blood or blood components are given to a person through a vein. It is usually done to replace blood lost during surgery, injury, or disease.",
+  "types of blood groups": "The main blood groups in the ABO and Rh system are: A+, A-, B+, B-, AB+, AB-, O+, and O-. They are based on the presence or absence of A/B antigens and the Rh factor on red blood cells.",
+  "difference between a+ and a- blood": "A+ and A- both have A antigen on red blood cells, but A+ has the Rh factor while A- does not. A+ can receive A+, A-, O+, O- blood, while A- can receive only A- and O- safely.",
+  "what is hemoglobin": "Hemoglobin is the iron-containing protein in red blood cells that carries oxygen from the lungs to the rest of the body and returns carbon dioxide back to the lungs.",
+  "what is rh factor": "Rh factor is a protein that can be present on the surface of red blood cells. If you have it, you are Rh positive (e.g., A+, O+). If you don’t, you are Rh negative (e.g., A-, O-).",
+  "what is universal donor": "O negative (O-) blood is called the universal donor for red blood cells because it usually can be given to people of any ABO and Rh blood group in emergencies.",
+  "what is universal recipient": "AB positive (AB+) blood is called the universal recipient for red blood cells because people with AB+ can receive blood from any ABO and Rh group.",
+  "what is plasma": "Plasma is the liquid part of blood. It is mostly water and contains proteins, hormones, nutrients, and waste products. It helps carry cells and substances around the body.",
+  "what is blood smear": "A blood smear is a lab test where a drop of blood is spread on a glass slide, stained, and examined under a microscope to look at the size, shape, and number of blood cells.",
+  "why is blood grouping important": "Blood grouping is important to ensure safe blood transfusions, avoid dangerous reactions, and help in pregnancy care, organ transplantation, and some medical treatments."
 }
