@@ -20,8 +20,9 @@ GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-1.5-flash:generateContent"
+    "gemini-2.5-flash:generateContent"
 )
+
 
 def ask_gemini(question: str) -> str:
     """Call Gemini API using HTTP POST and return the text reply."""
@@ -217,3 +218,4 @@ if st.button("Get AI Response"):
         with st.spinner("Contacting Gemini..."):
             answer = ask_gemini(user_question)
         st.write(answer)
+
