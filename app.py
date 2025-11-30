@@ -283,10 +283,12 @@ with tab_history:
 
 
 # ---------- Chat Tab ----------
+# ---------- Chat Tab ----------
 with tab_chat:
     st.markdown("### Chat with AI about blood groups or your results")
     st.caption("Example: *What is the difference between A+ and A- blood?*")
 
+    # Show chat history (bubbles)
     st.markdown('<div class="chat-box">', unsafe_allow_html=True)
     for msg in st.session_state["chat"]:
         cls = "chat-bubble-user" if msg["role"] == "user" else "chat-bubble-bot"
@@ -299,14 +301,19 @@ with tab_chat:
         if not question.strip():
             st.warning("Enter a question first.")
         else:
+            # add user message to history
             st.session_state["chat"].append({"role": "user", "text": question})
+
+            # think...
             with st.spinner("Thinking..."):
-    local_answer = find_local_answer(question)
-    if local_answer:
-        reply = local_answer + "\n\n(Answer from built-in knowledge base)"
-    else:
-        reply = ask_gemini(question)
+                local_answer = find_local_answer(question)
+
+                if local_answer:
+                    reply = local_answer + "\n\n(Answer from built-in knowledge base)"
+                else:
+                    reply = ask_gemini(question)
+
+            # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
-
 
