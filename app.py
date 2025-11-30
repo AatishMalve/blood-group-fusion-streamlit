@@ -5,14 +5,18 @@ from datetime import datetime
 import numpy as np
 import streamlit as st
 import google.generativeai as genai
-
-GOOGLE_API_KEY = "YOUR_NEW_VALID_API_KEY_HERE"
-genai.configure(AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc)
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
 import gdown
+
+# -----------------------
+# Gemini / Google API Key
+# -----------------------
+# ⛔ Don't commit your real key to GitHub or share it publicly.
+GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # -----------------------
 # Paths and Google Drive model
@@ -57,7 +61,7 @@ def load_model():
     )
     return model
 
-model = load_model()
+cnn_model = load_model()  # renamed from "model" to avoid confusion with Gemini model
 
 # -----------------------
 # Preprocessing helpers
@@ -117,7 +121,7 @@ if uploaded_file is not None:
             lenet_input = preprocess_lenet(image)
 
             # model expects [resnet_batch, lenet_batch]
-            preds = model.predict([resnet_input, lenet_input])
+            preds = cnn_model.predict([resnet_input, lenet_input])
             idx = int(np.argmax(preds))
             confidence = float(np.max(preds))
 
@@ -149,3 +153,27 @@ if st.button("Show prediction history"):
         st.write(f"Total predictions: **{len(history)}**")
         st.table(history)
 
+# -----------------------
+# Gemini Chatbot Section
+# -----------------------
+st.markdown("---")
+st.subheader("💬 Ask AI about blood groups or results")
+
+user_question = st.text_input("Type your question here:")
+
+if st.button("Get AI Response"):
+    if not user_question.strip():
+        st.warning("Please enter a question before asking.")
+    else:
+        try:
+            gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = (
+                "You are an AI assistant helping with questions about blood groups, "
+                "blood smear analysis, and interpreting blood group prediction results. "
+                "Explain things in simple, clear language.\n\n"
+                f"User question: {user_question}"
+            )
+            response = gemini_model.generate_content(prompt)
+            st.write(response.text)
+        except Exception as e:
+            st.error(f"Error while contacting Gemini API: {e}")
