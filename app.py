@@ -11,6 +11,27 @@ from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
 import gdown
+import json
+from difflib import get_close_matches
+
+# Load predefined Q&A
+with open("qa_data.json", "r", encoding="utf-8") as f:
+    QA_DATA = json.load(f)
+
+def find_local_answer(question: str):
+    q = question.lower().strip()
+
+    # Exact match
+    if q in QA_DATA:
+        return QA_DATA[q]
+
+    # Fuzzy close match
+    matches = get_close_matches(q, QA_DATA.keys(), n=1, cutoff=0.75)
+    if matches:
+        return QA_DATA[matches[0]]
+
+    return None
+
 
 # ==========================
 # GEMINI API CONFIG
@@ -280,7 +301,12 @@ with tab_chat:
         else:
             st.session_state["chat"].append({"role": "user", "text": question})
             with st.spinner("Thinking..."):
-                reply = ask_gemini(question)
+    local_answer = find_local_answer(question)
+    if local_answer:
+        reply = local_answer + "\n\n(Answer from built-in knowledge base)"
+    else:
+        reply = ask_gemini(question)
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
 
