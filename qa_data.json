@@ -8,8 +8,8 @@
   "what is universal recipient": "AB positive (AB+) blood is called the universal recipient for red blood cells because people with AB+ can receive blood from any ABO and Rh group.",
   "what is plasma": "Plasma is the liquid part of blood. It is mostly water and contains proteins, hormones, nutrients, and waste products. It helps carry cells and substances around the body.",
   "what is blood smear": "A blood smear is a lab test where a drop of blood is spread on a glass slide, stained, and examined under a microscope to look at the size, shape, and number of blood cells.",
-  "why is blood grouping important": "Blood grouping is important to ensure safe blood transfusions, avoid dangerous reactions, and help in pregnancy care, organ transplantation, and some medical treatments."
-   "what is the purpose of predicting blood group from fingerprints": "The purpose is to explore whether fingerprint patterns can be used as a non-invasive, fast and cost-effective method to predict ABO/Rh blood groups using machine learning, reducing dependency on traditional serological tests.",
+  "why is blood grouping important": "Blood grouping is important to ensure safe blood transfusions, avoid dangerous reactions, and help in pregnancy care, organ transplantation, and some medical treatments.",
+  "what is the purpose of predicting blood group from fingerprints": "The purpose is to explore whether fingerprint patterns can be used as a non-invasive, fast and cost-effective method to predict ABO/Rh blood groups using machine learning, reducing dependency on traditional serological tests.",
   "what models were used in this research": "The research evaluated CNN-based models including LeNet, ResNet50, ResNet101, ResNeXt101, DenseNet121, Vision Transformers such as Swin and ViT, and a Hybrid Fusion model combining multi-network feature extraction.",
   "what is a hybrid fusion model": "A Hybrid Fusion model combines feature extraction outputs from multiple CNN networks, enabling richer representation of dermatoglyphic fingerprint features and improving classification accuracy by merging complementary features.",
   "which model achieved the highest accuracy": "The Hybrid Fusion model achieved the highest accuracy and F1 score, with 95.22% accuracy and an F1 score of 0.9522.",
@@ -46,9 +46,7 @@
   "what are the limitations of this approach": "Limitations include dataset size, risk of bias, reduced transformer performance, and inability to replace laboratory blood typing.",
   "how can this model be improved in the future": "The system can improve through dataset expansion, on-device AI optimization, sensor fusion, IoT integration, and deep learning refinement such as transfer learning.",
   "why are transfusion decisions important": "Safe blood transfusion decisions depend on accurate blood group matching; incorrect matching can cause severe immune reactions.",
-  "what is the difference between abo and rh groups": "ABO classification identifies the presence of A or B antigens on red blood cells, while Rh determines the presence of the Rh factor. Together they form types like A+, O-, etc."
-   "which models were used": "The study evaluated LeNet, ResNet50, ResNet101, ResNeXt101, DenseNet121, Swin Transformer, Vision Transformer (ViT), and a Hybrid Fusion model. The Hybrid Fusion model achieved the best overall accuracy."
-    "which model gave best result": "The Hybrid Fusion model achieved the best performance with 95.22% accuracy and an F1 score of 0.9522, outperforming all CNN and Vision Transformer models."
-
-
+  "what is the difference between abo and rh groups": "ABO classification identifies the presence of A or B antigens on red blood cells, while Rh determines the presence of the Rh factor. Together they form types like A+, O-, etc.",
+  "which models were used": "The study evaluated LeNet, ResNet50, ResNet101, ResNeXt101, DenseNet121, Swin Transformer, Vision Transformer (ViT), and a Hybrid Fusion model. The Hybrid Fusion model achieved the best overall accuracy.",
+  "which model gave best result": "The Hybrid Fusion model achieved the best performance with 95.22% accuracy and an F1 score of 0.9522, outperforming all CNN and Vision Transformer models."
 }
