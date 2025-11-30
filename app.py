@@ -16,7 +16,8 @@ from fpdf import FPDF   # for PDF export
 # -----------------------
 # Gemini API Key
 # -----------------------
-GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"  # <-- put your real key here
+# ⚠️ Replace with a NEW key from Google AI Studio. Don't push real key to GitHub.
+GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -122,7 +123,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Small logo + title (less scrolling, compact)
+# Small logo + title (compact)
 logo_col, title_col = st.columns([1, 5])
 with logo_col:
     st.image(
@@ -201,10 +202,10 @@ def load_history():
 # Session state for chat & last prediction
 # -----------------------
 if "chat" not in st.session_state:
-    st.session_state.chat = []   # list of dicts: {"role": "user"/"bot", "text": ...}
+    st.session_state.chat = []   # [{"role": "user"/"bot", "text": "..."}]
 
 if "last_report" not in st.session_state:
-    st.session_state.last_report = None  # to enable PDF download after prediction
+    st.session_state.last_report = None  # for PDF download
 
 # -----------------------
 # Tabs Layout
@@ -288,7 +289,12 @@ with tab_pred:
         pdf.cell(0, 8, f"Predicted Blood Group: {rep['prediction']}", ln=True)
         pdf.cell(0, 8, f"Model Confidence: {rep['confidence']:.2f}%", ln=True)
 
-        pdf_bytes = pdf.output(dest="S").encode("latin-1")
+        pdf_out = pdf.output(dest="S")  # may be str or bytes
+        if isinstance(pdf_out, str):
+            pdf_bytes = pdf_out.encode("latin-1")
+        else:
+            pdf_bytes = pdf_out
+
         st.download_button(
             label="📄 Download Prediction as PDF",
             data=pdf_bytes,
