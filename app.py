@@ -329,7 +329,7 @@ with tab_chat:
 
     user_question = st.text_area("Type your question here:", height=80)
 
-    if st.button("Ask AI", use_container_width=True):
+        if st.button("Ask AI", use_container_width=True):
         if not user_question.strip():
             st.warning("Please enter a question before asking.")
         else:
@@ -337,4 +337,6 @@ with tab_chat:
             with st.spinner("Thinking..."):
                 answer = ask_gemini(user_question)
             st.session_state.chat.append({"role": "bot", "text": answer})
-            st.experimental_rerun()
+            st.rerun()
+
+
