@@ -15,7 +15,7 @@ import gdown
 # ==========================
 # GEMINI API CONFIG
 # ==========================
-GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"   # <- put your key here
+GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"   # <- put your key here
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -283,3 +283,4 @@ with tab_chat:
                 reply = ask_gemini(question)
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
