@@ -16,7 +16,7 @@ import gdown
 # Gemini / Google API Key
 # -----------------------
 # ⛔ IMPORTANT: put your real key here, but don't share it publicly.
-GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
+GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -228,3 +228,4 @@ if st.button("Get AI Response"):
         with st.spinner("Contacting Gemini..."):
             answer = ask_gemini(user_question)
         st.write(answer)
+
