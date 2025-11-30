@@ -11,12 +11,11 @@ from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
 import gdown
-from fpdf import FPDF
 
 # ==========================
 # GEMINI API CONFIG
 # ==========================
-GOOGLE_API_KEY = "AIzaSyAkcqpRvFiT46L4BG7WGqTDWsv1CdUuVOc"   # Replace with your new valid key
+GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"   # <- put your key here
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -32,7 +31,14 @@ def ask_gemini(question: str) -> str:
         "contents": [
             {
                 "parts": [
-                    {"text": "Explain in simple words:\n" + question}
+                    {
+                        "text": (
+                            "You are an AI assistant helping with questions about blood groups, "
+                            "blood smear analysis, and interpreting blood group prediction results. "
+                            "Explain things in simple, clear language.\n\n"
+                            f"User question: {question}"
+                        )
+                    }
                 ]
             }
         ]
@@ -42,13 +48,19 @@ def ask_gemini(question: str) -> str:
         resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return "No response from Gemini (no candidates)."
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "No response from Gemini (no content parts)."
+        return parts[0].get("text", "Gemini returned no text.")
     except Exception as e:
         return f"Error talking to Gemini API: {e}"
 
 
 # ==========================
-# STREAMLIT PAGE CONFIG
+# STREAMLIT PAGE STYLE
 # ==========================
 st.set_page_config(page_title="Blood Group Detection", page_icon="🩸", layout="wide")
 
@@ -84,6 +96,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Small logo + title
+logo_col, title_col = st.columns([1, 5])
+with logo_col:
+    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=70)
+with title_col:
+    st.markdown("### 🩸 Blood Group Detection – Fusion CNN")
+    st.caption("ResNet50 + LeNet based model with AI assistant for explanations.")
+
+st.markdown("---")
+
 
 # ==========================
 # MODEL SETUP
@@ -95,14 +117,15 @@ MODEL_URL = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
 
 HISTORY_CSV = os.path.join(BASE_DIR, "prediction_history.csv")
 CLASS_LABELS = ['A+', 'A-', 'AB+', 'AB-', 'B+', 'B-', 'O+', 'O-']
-
 RESNET_IMG_SIZE = (256, 256)
 LENET_IMG_SIZE = (32, 32)
 
 def squeeze_excite_block(input_tensor, ratio=16):
     filters = input_tensor.shape[-1]
-    se = Dense(filters // ratio, activation="relu", kernel_initializer="he_normal", use_bias=False)(input_tensor)
-    se = Dense(filters, activation="sigmoid", kernel_initializer="he_normal", use_bias=False)(se)
+    se = Dense(filters // ratio, activation="relu",
+               kernel_initializer="he_normal", use_bias=False)(input_tensor)
+    se = Dense(filters, activation="sigmoid",
+               kernel_initializer="he_normal", use_bias=False)(se)
     return Multiply()([input_tensor, se])
 
 @st.cache_resource
@@ -110,7 +133,8 @@ def load_model():
     if not os.path.exists(MODEL_PATH):
         with st.spinner("Downloading model (first time only)..."):
             gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
-    return tf.keras.models.load_model(MODEL_PATH, custom_objects={"squeeze_excite_block": squeeze_excite_block})
+    return tf.keras.models.load_model(MODEL_PATH,
+                                      custom_objects={"squeeze_excite_block": squeeze_excite_block})
 
 cnn_model = load_model()
 
@@ -152,108 +176,110 @@ tab_predict, tab_history, tab_chat = st.tabs(["🔍 Prediction", "📜 History",
 
 # ---------- Prediction Tab ----------
 with tab_predict:
+    st.markdown("### Upload image and predict blood group")
 
-    user = st.text_input("User Name", "")
-    uploaded = st.file_uploader("Upload blood smear image", type=["jpg", "jpeg", "png", "bmp"])
+    col_left, col_right = st.columns([2, 1])
+    with col_left:
+        username_input = st.text_input("User Name", "")
+        uploaded_file = st.file_uploader("Upload blood smear image", type=["jpg", "jpeg", "png", "bmp"])
+    with col_right:
+        st.info("Tips:\n- Use clear blood smear images\n- Supported: JPG, JPEG, PNG, BMP")
 
-    if uploaded:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            img = Image.open(uploaded)
+    if uploaded_file:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            img = Image.open(uploaded_file)
             st.image(img, caption="Uploaded Image", width=350)
+        with c2:
+            st.write("**File details**")
+            st.write(f"Name: `{uploaded_file.name}`")
+            st.write(f"Size: {round(len(uploaded_file.getvalue())/1024, 2)} KB")
+            st.write(f"Type: {uploaded_file.type}")
 
-        if st.button("Predict"):
+        if st.button("Predict", use_container_width=True):
             with st.spinner("Detecting blood group..."):
-                pr1 = preprocess_resnet(img)
-                pr2 = preprocess_lenet(img)
-                preds = cnn_model.predict([pr1, pr2])
+                res_in = preprocess_resnet(img)
+                len_in = preprocess_lenet(img)
+                preds = cnn_model.predict([res_in, len_in])
                 idx = int(np.argmax(preds))
                 conf = round(float(np.max(preds)) * 100, 2)
 
             label = CLASS_LABELS[idx]
-            timeIST = datetime.now(pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S")
-            username = user.strip() or "Anonymous"
+            ist = pytz.timezone("Asia/Kolkata")
+            timestamp = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+            display_name = username_input.strip() or "Anonymous"
 
             st.session_state["last_report"] = {
-                "user": username,
-                "timestamp": timeIST,
+                "user": display_name,
+                "timestamp": timestamp,
                 "label": label,
                 "confidence": conf,
             }
 
-            log_history(username, timeIST, label, conf)
+            log_history(display_name, timestamp, label, conf)
 
             st.markdown(
                 f"""
                 <div class="report-card">
-                <h4>🩸 Prediction Report</h4>
-                <b>User:</b> {username}<br>
-                <b>Time:</b> {timeIST}<br>
-                <b>Prediction:</b> {label}<br>
-                <b>Confidence:</b> {conf}%</div>
+                    <h4>🩸 Prediction Report</h4>
+                    <b>User:</b> {display_name}<br>
+                    <b>Date/Time:</b> {timestamp}<br>
+                    <b>Prediction:</b> {label}<br>
+                    <b>Confidence:</b> {conf}%<br>
+                </div>
                 """,
                 unsafe_allow_html=True
             )
 
-        if st.session_state["last_report"]:
+    # Simple text report download (no PDF headaches)
+    if st.session_state["last_report"]:
         rep = st.session_state["last_report"]
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "BloodPrint Prediction Report", ln=True)
-        pdf.set_font("Arial", "", 12)
-        pdf.ln(4)
-        pdf.cell(0, 8, f"User: {rep['user']}", ln=True)
-        pdf.cell(0, 8, f"Date/Time: {rep['timestamp']}", ln=True)
-        pdf.cell(0, 8, f"Prediction: {rep['label']}", ln=True)
-        pdf.cell(0, 8, f"Confidence: {rep['confidence']}%", ln=True)
-
-        pdf_out = pdf.output(dest="S")
-        if isinstance(pdf_out, str):
-            pdf_bytes = pdf_out.encode("latin-1")
-        else:
-            pdf_bytes = bytes(pdf_out)
-
-        st.download_button(
-            "📄 Download PDF Report",
-            pdf_bytes,
-            "report.pdf",
-            "application/pdf"
+        report_text = (
+            "BloodPrint Prediction Report\n"
+            "----------------------------\n"
+            f"User: {rep['user']}\n"
+            f"Date/Time: {rep['timestamp']}\n"
+            f"Prediction: {rep['label']}\n"
+            f"Confidence: {rep['confidence']}%\n"
         )
-
+        st.download_button(
+            "📄 Download Report (TXT)",
+            report_text.encode("utf-8"),
+            "bloodprint_report.txt",
+            "text/plain",
+            use_container_width=True,
+        )
 
 
 # ---------- History Tab ----------
 with tab_history:
-    hist = load_history()
-    if not hist:
+    st.markdown("### Previous Predictions")
+    history = load_history()
+    if not history:
         st.info("No previous predictions available.")
     else:
-        st.dataframe(hist, use_container_width=True)
+        st.dataframe(history, use_container_width=True)
 
 
 # ---------- Chat Tab ----------
 with tab_chat:
-
-    st.caption("Example: What is the difference between A+ and A- blood?")
+    st.markdown("### Chat with AI about blood groups or your results")
+    st.caption("Example: *What is the difference between A+ and A- blood?*")
 
     st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-    for m in st.session_state["chat"]:
-        bubble = "chat-bubble-user" if m["role"] == "user" else "chat-bubble-bot"
-        st.markdown(f'<div class="{bubble}">{m["text"]}</div>', unsafe_allow_html=True)
+    for msg in st.session_state["chat"]:
+        cls = "chat-bubble-user" if msg["role"] == "user" else "chat-bubble-bot"
+        st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     question = st.text_input("Ask AI:")
 
     if st.button("Ask", use_container_width=True):
-        if question.strip():
+        if not question.strip():
+            st.warning("Enter a question first.")
+        else:
             st.session_state["chat"].append({"role": "user", "text": question})
             with st.spinner("Thinking..."):
                 reply = ask_gemini(question)
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
-        else:
-            st.warning("Enter a question first!")
-
-
