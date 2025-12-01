@@ -17,7 +17,6 @@ from difflib import get_close_matches
 from typing import List, Optional
 
 # NEW: import orchestrator from uploaded module (must be in same folder)
-# If you don't want to use it, you can remove this import and the run_sources call below.
 try:
     from MultiLLMsV3 import run_sources
     _MULTI_LLMS_AVAILABLE = True
@@ -61,8 +60,8 @@ def find_local_answer(question: str):
 # ==========================
 # GEMINI API CONFIG
 # ==========================
-# ⚠️ Put your own valid Gemini API key here. Don't commit real keys to public repos.
-GOOGLE_API_KEY = "AIzaSyDN0-zVv54MjKugnvtnQhNHBvN4JjmxqA0"
+# Prefer reading key from environment; fallback to any hard-coded value present
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyDN0-zVv54MjKugnvtnQhNHBvN4JjmxqA0")
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -71,9 +70,11 @@ GEMINI_URL = (
 
 
 def ask_gemini(question: str) -> str:
-    """Fallback: call Gemini API if local JSON has no answer."""
+    """Call Gemini API and always return user-friendly fallback on failure.
+    Successful responses return raw text. Failures return strings starting with '[FALLBACK] <reason>'."""
     if not GOOGLE_API_KEY:
-        return "Gemini API key is not configured."
+        tech = "API key missing"
+        return f"[FALLBACK] {tech}"
 
     headers = {"Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY}
     payload = {
@@ -82,10 +83,10 @@ def ask_gemini(question: str) -> str:
                 "parts": [
                     {
                         "text": (
-                            "You are an AI assistant helping with questions about blood groups, "
-                            "fingerprint-based prediction models, and interpreting results. "
-                            "Explain things in simple, clear language.\n\n"
-                            f"User question: {question}"
+                            "You are an AI assistant helping with blood groups, Rh factor, "
+                            "fingerprint-based prediction, and medical explanations.\n"
+                            "Explain simply.\n\n"
+                            f"Question: {question}"
                         )
                     }
                 ]
@@ -95,21 +96,31 @@ def ask_gemini(question: str) -> str:
 
     try:
         resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
-        resp.raise_for_status()
+
+        # If HTTP not OK → return fallback with reason
+        if resp.status_code != 200:
+            tech = f"HTTP {resp.status_code}: {resp.text}"
+            return f"[FALLBACK] {tech}"
+
         data = resp.json()
+
         candidates = data.get("candidates", [])
         if not candidates:
-            return "No response from Gemini (no candidates)."
+            return "[FALLBACK] No candidates returned"
+
         parts = candidates[0].get("content", {}).get("parts", [])
         if not parts:
-            return "No response from Gemini (no content parts)."
-        return parts[0].get("text", "Gemini returned no text.")
-    except Exception:
-        # Graceful fallback if Gemini fails
-        return (
-            "I couldn’t contact the Gemini service right now. "
-            "Please try again later or ask another question from the knowledge base."
-        )
+            return "[FALLBACK] No content parts returned"
+
+        text = parts[0].get("text")
+        if not text:
+            return "[FALLBACK] Gemini returned empty text"
+
+        return text  # SUCCESS
+
+    except Exception as e:
+        tech = f"Exception: {e}"
+        return f"[FALLBACK] {tech}"
 
 
 # ==========================
@@ -347,6 +358,14 @@ with tab_chat:
         st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # NEW: allow user to choose sources (uses run_sources from MultiLLMsV3 if available)
+    source_options = ["Saved Q&A", "Gemini", "Website Scraping", "Semantic Website Scraping", "Local Files"]
+    selected = st.multiselect("Where should I look for answers?", source_options, default=["Saved Q&A"])
+
+    gemini_model = None
+    if "Gemini" in selected:
+        gemini_model = st.selectbox("Gemini model:", ["gemini-1.5-flash", "gemini-1.5-pro"], index=0)
+
     question = st.text_input("Ask AI:")
 
     if st.button("Ask", use_container_width=True):
@@ -359,7 +378,8 @@ with tab_chat:
             # call the MultiLLMsV3 orchestrator if available and user requested any source
             with st.spinner("Thinking..."):
                 answers: List[str] = []
-                if _MULTI_LLMS_AVAILABLE:
+
+                if _MULTI_LLMS_AVAILABLE and selected:
                     try:
                         # If user didn't select anything, default to Saved Q&A
                         if not selected:
@@ -374,9 +394,24 @@ with tab_chat:
                     if local_answer:
                         answers = [local_answer + "\n\n(Answer from built-in knowledge base)"]
                     else:
-                        # use direct Gemini call as a final fallback
-                        gm = ask_gemini(question)
-                        answers = [gm]
+                        # use direct Gemini call as a final fallback (single call)
+                        gemini_answer = ask_gemini(question)
+
+                        if gemini_answer.startswith("[FALLBACK]"):
+                            # Extract the technical reason
+                            tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
+
+                            reply = (
+                                "I couldn't find a confident answer for that right now.\n\n"
+                                "🔹 Try rephrasing your question\n"
+                                "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
+                                f"_Technical note: {tech_note}_"
+                            )
+                        else:
+                            reply = gemini_answer
+
+                        # set answers to a single reply to keep downstream code consistent
+                        answers = [reply]
 
                 # build a single reply string (join multiple responses)
                 reply = "\n\n".join(answers)
@@ -384,7 +419,3 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
-
-
-
-
