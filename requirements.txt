@@ -12,3 +12,4 @@ python-docx
 PyPDF2
 scikit-learn
 google-generativeai
+lxml
