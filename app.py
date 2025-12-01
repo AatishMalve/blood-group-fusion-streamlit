@@ -385,7 +385,7 @@ with tab_chat:
                 if (not _MULTI_LLMS_AVAILABLE) or not answers:
                     local_answer = find_local_answer(question)
                     if local_answer:
-                        answers = [local_answer + "\n\n(Answer from built-in knowledge base)"]
+                        answers = [local_answer]
                     else:
                         # use direct Gemini call as a final fallback (single call)
                         gemini_answer = ask_gemini(question)
@@ -411,4 +411,5 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
 
