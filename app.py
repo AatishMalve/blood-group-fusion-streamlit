@@ -14,6 +14,15 @@ import gdown
 import json
 import re
 from difflib import get_close_matches
+from typing import List, Optional
+
+# NEW: import orchestrator from uploaded module (must be in same folder)
+# If you don't want to use it, you can remove this import and the run_sources call below.
+try:
+    from MultiLLMsV3 import run_sources
+    _MULTI_LLMS_AVAILABLE = True
+except Exception:
+    _MULTI_LLMS_AVAILABLE = False
 
 # ==========================
 # Load predefined Q&A (JSON)
@@ -338,6 +347,14 @@ with tab_chat:
         st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # NEW: allow user to choose sources (uses run_sources from MultiLLMsV3 if available)
+    source_options = ["Saved Q&A", "Gemini", "Website Scraping", "Semantic Website Scraping", "Local Files"]
+    selected = st.multiselect("Where should I look for answers?", source_options, default=["Saved Q&A"])
+
+    gemini_model = None
+    if "Gemini" in selected:
+        gemini_model = st.selectbox("Gemini model:", ["gemini-1.5-flash", "gemini-1.5-pro"], index=0)
+
     question = st.text_input("Ask AI:")
 
     if st.button("Ask", use_container_width=True):
@@ -347,14 +364,30 @@ with tab_chat:
             # add user message to history
             st.session_state["chat"].append({"role": "user", "text": question})
 
-            # think...
+            # call the MultiLLMsV3 orchestrator if available and user requested any source
             with st.spinner("Thinking..."):
-                local_answer = find_local_answer(question)
+                answers: List[str] = []
+                if _MULTI_LLMS_AVAILABLE:
+                    try:
+                        # If user didn't select anything, default to Saved Q&A
+                        if not selected:
+                            selected = ["Saved Q&A"]
+                        answers = run_sources(question, selected, gemini_model)
+                    except Exception as e:
+                        answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
 
-                if local_answer:
-                    reply = local_answer + "\n\n(Answer from built-in knowledge base)"
-                else:
-                    reply = ask_gemini(question)
+                # fallback behavior if run_sources isn't available or returned nothing
+                if (not _MULTI_LLMS_AVAILABLE) or not answers:
+                    local_answer = find_local_answer(question)
+                    if local_answer:
+                        answers = [local_answer + "\n\n(Answer from built-in knowledge base)"]
+                    else:
+                        # use direct Gemini call as a final fallback
+                        gm = ask_gemini(question)
+                        answers = [gm]
+
+                # build a single reply string (join multiple responses)
+                reply = "\n\n".join(answers)
 
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
