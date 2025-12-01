@@ -1,4 +1,11 @@
 {
+  "hi": "Hello! How can I help you with blood groups or predictions today?",
+  "hello": "Hi there! You can ask me about blood groups or the fingerprint-based prediction system.",
+  "hey": "Hey! Ask me anything about blood groups, Rh factor, or the prediction model.",
+  "good morning": "Good morning! How can I assist you with blood group information?",
+  "good evening": "Good evening! Feel free to ask anything about blood groups or predictions.",
+  "how are you": "I'm here and ready to help! Ask me your question about blood groups or the system.",
+  "what can you do": "I can answer questions about blood groups and explain the fingerprint prediction project."
   "what is blood transfusion": "Blood transfusion is a medical procedure where blood or blood components are given to a person through a vein. It is usually done to replace blood lost during surgery, injury, or disease.",
   "types of blood groups": "The main blood groups in the ABO and Rh system are: A+, A-, B+, B-, AB+, AB-, O+, and O-. They are based on the presence or absence of A/B antigens and the Rh factor on red blood cells.",
   "difference between a+ and a- blood": "A+ and A- both have A antigen on red blood cells, but A+ has the Rh factor while A- does not. A+ can receive A+, A-, O+, O- blood, while A- can receive only A- and O- safely.",
