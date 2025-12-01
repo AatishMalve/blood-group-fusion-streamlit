@@ -6,10 +6,3 @@ gdown
 requests
 pytz
 fpdf2
-beautifulsoup4
-rapidfuzz
-python-docx
-PyPDF2
-scikit-learn
-google-generativeai
-lxml
