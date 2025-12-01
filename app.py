@@ -62,7 +62,7 @@ def find_local_answer(question: str):
 # GEMINI API CONFIG
 # ==========================
 # ⚠️ Put your own valid Gemini API key here. Don't commit real keys to public repos.
-GOOGLE_API_KEY = "AIzaSyA9Jh3U6UR8xj4kGvKqYuufvmiqDXaD15E"
+GOOGLE_API_KEY = "AIzaSyDN0-zVv54MjKugnvtnQhNHBvN4JjmxqA0"
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -392,5 +392,6 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
 
 
