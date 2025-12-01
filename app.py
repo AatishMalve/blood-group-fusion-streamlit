@@ -347,14 +347,6 @@ with tab_chat:
         st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # NEW: allow user to choose sources (uses run_sources from MultiLLMsV3 if available)
-    source_options = ["Saved Q&A", "Gemini", "Website Scraping", "Semantic Website Scraping", "Local Files"]
-    selected = st.multiselect("Where should I look for answers?", source_options, default=["Saved Q&A"])
-
-    gemini_model = None
-    if "Gemini" in selected:
-        gemini_model = st.selectbox("Gemini model:", ["gemini-1.5-flash", "gemini-1.5-pro"], index=0)
-
     question = st.text_input("Ask AI:")
 
     if st.button("Ask", use_container_width=True):
@@ -392,6 +384,7 @@ with tab_chat:
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.rerun()
+
 
 
 
