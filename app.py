@@ -33,7 +33,7 @@ except (FileNotFoundError, json.JSONDecodeError):
 
 
 def find_local_answer(question: str):
-    """Try to answer from local JSON first (exact + fuzzy)."""
+    """Return answer from local JSON if exact or slightly similar; else None."""
     q = clean_text(question)
 
     # Exact match
@@ -42,7 +42,7 @@ def find_local_answer(question: str):
 
     # Fuzzy close match – similar but not too loose
     keys = list(QA_DATA.keys())
-    matches = get_close_matches(q, keys, n=1, cutoff=0.7)
+    matches = get_close_matches(q, keys, n=1, cutoff=0.7)  # 0.7 ~ “little bit similar”
     if matches:
         return QA_DATA[matches[0]]
 
