@@ -251,6 +251,65 @@ def load_history():
 st.session_state.setdefault("chat", [])
 st.session_state.setdefault("last_report", None)
 
+# ==========================
+# ASK BUTTON CALLBACK
+# ==========================
+def handle_ask():
+    question = st.session_state.get("question_input", "").strip()
+
+    if not question:
+        st.warning("Enter a question first.")
+        return
+
+    # add user message to history
+    st.session_state["chat"].append({"role": "user", "text": question})
+
+    # call the MultiLLMsV3 orchestrator if available and user requested any source
+    with st.spinner("Thinking..."):
+        answers: List[str] = []
+
+        if _MULTI_LLMS_AVAILABLE and selected:
+            try:
+                # If user didn't select anything, default to Saved Q&A
+                if not selected:
+                    selected = ["Saved Q&A"]
+                answers = run_sources(question, selected, gemini_model)
+            except Exception as e:
+                answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
+
+        # fallback behavior if run_sources isn't available or returned nothing
+        if (not _MULTI_LLMS_AVAILABLE) or not answers:
+            local_answer = find_local_answer(question)
+            if local_answer:
+                answers = [local_answer]
+            else:
+                # use direct Gemini call as a final fallback (single call)
+                gemini_answer = ask_gemini(question)
+
+                if gemini_answer.startswith("[FALLBACK]"):
+                    # Extract the technical reason
+                    tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
+
+                    reply = (
+                        "I couldn't find a confident answer for that right now.\n\n"
+                        "🔹 Try rephrasing your question\n"
+                        "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
+                    )
+                else:
+                    reply = gemini_answer
+
+                # set answers to a single reply to keep downstream code consistent
+                answers = [reply]
+
+        # build a single reply string (join multiple responses)
+        reply = "\n\n".join(answers)
+
+    # add bot reply to history
+    st.session_state["chat"].append({"role": "bot", "text": reply})
+
+    # clear textbox
+    st.session_state["question_input"] = ""
+
 
 # ==========================
 # TABS
@@ -358,62 +417,8 @@ with tab_chat:
         st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # NEW: allow user to choose sources (uses run_sources from MultiLLMsV3 if available)
-    question = st.text_input("Ask AI:", key="question_input")
+    # Text input with key stored in session_state
+    st.text_input("Ask AI:", key="question_input")
 
-
-    if st.button("Ask", use_container_width=True):
-        if not question.strip():
-            st.warning("Enter a question first.")
-        else:
-            # add user message to history
-            st.session_state["chat"].append({"role": "user", "text": question})
-
-            # call the MultiLLMsV3 orchestrator if available and user requested any source
-            with st.spinner("Thinking..."):
-                answers: List[str] = []
-
-                if _MULTI_LLMS_AVAILABLE and selected:
-                    try:
-                        # If user didn't select anything, default to Saved Q&A
-                        if not selected:
-                            selected = ["Saved Q&A"]
-                        answers = run_sources(question, selected, gemini_model)
-                    except Exception as e:
-                        answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
-
-                # fallback behavior if run_sources isn't available or returned nothing
-                if (not _MULTI_LLMS_AVAILABLE) or not answers:
-                    local_answer = find_local_answer(question)
-                    if local_answer:
-                        answers = [local_answer]
-                    else:
-                        # use direct Gemini call as a final fallback (single call)
-                        gemini_answer = ask_gemini(question)
-
-                        if gemini_answer.startswith("[FALLBACK]"):
-                            # Extract the technical reason
-                            tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
-
-                            reply = (
-                                "I couldn't find a confident answer for that right now.\n\n"
-                                "🔹 Try rephrasing your question\n"
-                                "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
-                                   )
-                        else:
-                            reply = gemini_answer
-
-                        # set answers to a single reply to keep downstream code consistent
-                        answers = [reply]
-
-                # build a single reply string (join multiple responses)
-                reply = "\n\n".join(answers)
-
-            # add bot reply to history
-            st.session_state["chat"].append({"role": "bot", "text": reply})
-            st.session_state["question_input"] = ""
-            st.rerun()
-
-
-
-
+    # Button uses callback, which will also clear the textbox
+    st.button("Ask", use_container_width=True, on_click=handle_ask)
