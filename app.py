@@ -254,6 +254,9 @@ st.session_state.setdefault("last_report", None)
 # ==========================
 # ASK BUTTON CALLBACK
 # ==========================
+# ==========================
+# ASK BUTTON CALLBACK
+# ==========================
 def handle_ask():
     question = st.session_state.get("question_input", "").strip()
 
@@ -263,6 +266,27 @@ def handle_ask():
 
     # add user message to history
     st.session_state["chat"].append({"role": "user", "text": question})
+
+    # --- NEW: check if user is asking to show earlier prediction ---
+    q_lower = question.lower()
+    if "show" in q_lower and "prediction" in q_lower:
+        last = st.session_state.get("last_report")
+
+        if last:
+            reply = (
+                "Here is your last prediction:\n\n"
+                f"User: {last['user']}\n"
+                f"Date/Time: {last['timestamp']}\n"
+                f"Prediction: {last['label']}\n"
+                f"Confidence: {last['confidence']}%\n"
+            )
+        else:
+            reply = "Sorry, no earlier predictions, please predict first."
+
+        st.session_state["chat"].append({"role": "bot", "text": reply})
+        st.session_state["question_input"] = ""
+        return
+    # --- END NEW BLOCK ---
 
     # call the MultiLLMsV3 orchestrator if available and user requested any source
     with st.spinner("Thinking..."):
@@ -422,3 +446,4 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
