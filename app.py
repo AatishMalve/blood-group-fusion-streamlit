@@ -410,6 +410,8 @@ with tab_chat:
 
             # add bot reply to history
             st.session_state["chat"].append({"role": "bot", "text": reply})
+            st.session_state["question_input"] = ""
             st.rerun()
+
 
 
