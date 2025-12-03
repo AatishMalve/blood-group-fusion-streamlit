@@ -267,8 +267,9 @@ def handle_ask():
     # add user message to history
     st.session_state["chat"].append({"role": "user", "text": question})
 
-    # ----- NEW: check for "show all predictions" -----
     q_lower = question.lower()
+
+    # 1️⃣ SHOW ALL PREDICTIONS / HISTORY
     if ("show" in q_lower and "prediction" in q_lower and "all" in q_lower) or \
        ("show" in q_lower and "history" in q_lower) or \
        ("list" in q_lower and "prediction" in q_lower):
@@ -290,43 +291,73 @@ def handle_ask():
         st.session_state["chat"].append({"role": "bot", "text": reply})
         st.session_state["question_input"] = ""
         return
-    # ----- END NEW BLOCK -----
 
+    # 2️⃣ SHOW ONLY LAST / EARLIER PREDICTION
+    if ("show" in q_lower and "prediction" in q_lower and
+        ("earlier" in q_lower or "last" in q_lower or "recent" in q_lower)):
 
-    # ----- EXISTING AI LOGIC -----
+        last = st.session_state.get("last_report")
+        if last:
+            reply = (
+                "Here is your last prediction:\n\n"
+                f"User: {last['user']}\n"
+                f"Date/Time: {last['timestamp']}\n"
+                f"Prediction: {last['label']}\n"
+                f"Confidence: {last['confidence']}%\n"
+            )
+        else:
+            reply = "Sorry, no earlier predictions, please predict first."
+
+        st.session_state["chat"].append({"role": "bot", "text": reply})
+        st.session_state["question_input"] = ""
+        return
+
+    # 3️⃣ NORMAL AI FLOW (your existing logic)
     with st.spinner("Thinking..."):
         answers: List[str] = []
 
         if _MULTI_LLMS_AVAILABLE and selected:
             try:
+                # If user didn't select anything, default to Saved Q&A
                 if not selected:
                     selected = ["Saved Q&A"]
                 answers = run_sources(question, selected, gemini_model)
             except Exception as e:
                 answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
 
+        # fallback behavior if run_sources isn't available or returned nothing
         if (not _MULTI_LLMS_AVAILABLE) or not answers:
             local_answer = find_local_answer(question)
             if local_answer:
                 answers = [local_answer]
             else:
+                # use direct Gemini call as a final fallback (single call)
                 gemini_answer = ask_gemini(question)
 
                 if gemini_answer.startswith("[FALLBACK]"):
+                    # Extract the technical reason
+                    tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
+
                     reply = (
-                        "I couldn't find a confident answer right now.\n\n"
+                        "I couldn't find a confident answer for that right now.\n\n"
                         "🔹 Try rephrasing your question\n"
-                        "🔹 Or ask something related to blood groups or explanations\n"
+                        "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
                     )
                 else:
                     reply = gemini_answer
 
+                # set answers to a single reply to keep downstream code consistent
                 answers = [reply]
 
+        # build a single reply string (join multiple responses)
         reply = "\n\n".join(answers)
 
+    # add bot reply to history
     st.session_state["chat"].append({"role": "bot", "text": reply})
+
+    # clear textbox
     st.session_state["question_input"] = ""
+
 
 
 
@@ -441,5 +472,6 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
 
 
