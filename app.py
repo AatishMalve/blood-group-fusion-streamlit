@@ -61,7 +61,7 @@ def find_local_answer(question: str):
 # GEMINI API CONFIG
 # ==========================
 # Prefer reading key from environment; fallback to any hard-coded value present
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyDN0-zVv54MjKugnvtnQhNHBvN4JjmxqA0")
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyASOP1QwcY1HDCsz4En6a0z6cJXRkDHMTQ")
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -472,6 +472,7 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
 
 
 
