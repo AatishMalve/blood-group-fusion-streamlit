@@ -359,7 +359,8 @@ with tab_chat:
     st.markdown("</div>", unsafe_allow_html=True)
 
     # NEW: allow user to choose sources (uses run_sources from MultiLLMsV3 if available)
-    question = st.text_input("Ask AI:")
+    question = st.text_input("Ask AI:", key="question_input")
+
 
     if st.button("Ask", use_container_width=True):
         if not question.strip():
@@ -412,6 +413,7 @@ with tab_chat:
             st.session_state["chat"].append({"role": "bot", "text": reply})
             st.session_state["question_input"] = ""
             st.rerun()
+
 
 
 
