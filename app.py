@@ -126,42 +126,38 @@ def ask_gemini(question: str) -> str:
 # ==========================
 # STREAMLIT PAGE STYLE
 # ==========================
-st.set_page_config(page_title="Blood Group Detection", page_icon="🩸", layout="wide")
+st.set_page_config(page_title="Blood Group Detection – Fusion CNN")
 
+# Bigger title
 st.markdown(
     """
-<style>
-.report-card {
-    background-color: #ffffff;
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
-    border: 1px solid #ececec;
-}
-.chat-bubble-user {
-    background-color: #d8ebff;
-    padding: 8px 12px;
-    border-radius: 14px;
-    margin-bottom: 6px;
-    max-width: 80%;
-    margin-left: auto;
-}
-.chat-bubble-bot {
-    background-color: #ffffff;
-    padding: 8px 12px;
-    border-radius: 14px;
-    margin-bottom: 6px;
-    max-width: 80%;
-    border: 1px solid #e4e4ef;
-}
-.chat-box {
-    max-height: 350px;
-    overflow-y: auto;
-}
-</style>
-""",
-    unsafe_allow_html=True,
+    <h1 style="font-size:40px; font-weight:700; text-align:left;">
+        🩸 Blood Group Detection – Fusion CNN
+    </h1>
+    """,
+    unsafe_allow_html=True
 )
+
+# Tagline - medium size, left aligned
+st.markdown(
+    """
+    <p style="font-size:20px; font-weight:600; text-align:left; margin-top:-10px;">
+        Right blood. Right time. Saves life.
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
+# Description under the tagline
+st.markdown(
+    """
+    <p style="font-size:16px; text-align:left; margin-top:-5px;">
+        ResNet50 + LeNet based model with AI assistant for explanations.
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # Small logo + title
 logo_col, title_col = st.columns([1, 5])
@@ -480,6 +476,7 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
 
 
 
