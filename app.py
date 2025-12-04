@@ -172,7 +172,7 @@ with title_col:
     st.caption("ResNet50 + LeNet based model with AI assistant for explanations.")
     st.markdown(
     """
-    <p style="font-size:24px; font-weight:600; text-align:center; margin-top:0.5rem;">
+    <p style="font-size:20px; font-weight:600; text-align:left; margin-top:0.2rem;">
         Right blood. Right time. Saves life.
     </p>
     """,
@@ -480,6 +480,7 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
 
 
 
