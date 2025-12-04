@@ -5,13 +5,23 @@ from datetime import datetime
 import numpy as np
 import pytz
 import streamlit as st
+import requests
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
+import gdown
 import json
 import re
 from difflib import get_close_matches
+from typing import List, Optional
+
+# NEW: import orchestrator from uploaded module (must be in same folder)
+try:
+    from MultiLLMsV3 import run_sources
+    _MULTI_LLMS_AVAILABLE = True
+except Exception:
+    _MULTI_LLMS_AVAILABLE = False
 
 # ==========================
 # Load predefined Q&A (JSON)
@@ -40,11 +50,77 @@ def find_local_answer(question: str):
 
     # Fuzzy close match – similar but not too loose
     keys = list(QA_DATA.keys())
-    matches = get_close_matches(q, keys, n=1, cutoff=0.7)
+    matches = get_close_matches(q, keys, n=1, cutoff=0.7)  # 0.7 ~ “little bit similar”
     if matches:
         return QA_DATA[matches[0]]
 
     return None
+
+
+# ==========================
+# GEMINI API CONFIG
+# ==========================
+# Prefer reading key from environment; fallback to any hard-coded value present
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyASOP1QwcY1HDCsz4En6a0z6cJXRkDHMTQ")
+
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-1.5-flash-latest:generateContent"
+)
+
+
+def ask_gemini(question: str) -> str:
+    """Call Gemini API and always return user-friendly fallback on failure.
+    Successful responses return raw text. Failures return strings starting with '[FALLBACK] <reason>'."""
+    if not GOOGLE_API_KEY:
+        tech = "API key missing"
+        return f"[FALLBACK] {tech}"
+
+    headers = {"Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY}
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": (
+                            "You are an AI assistant helping with blood groups, Rh factor, "
+                            "fingerprint-based prediction, and medical explanations.\n"
+                            "Explain simply.\n\n"
+                            f"Question: {question}"
+                        )
+                    }
+                ]
+            }
+        ]
+    }
+
+    try:
+        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
+
+        # If HTTP not OK → return fallback with reason
+        if resp.status_code != 200:
+            tech = f"HTTP {resp.status_code}: {resp.text}"
+            return f"[FALLBACK] {tech}"
+
+        data = resp.json()
+
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return "[FALLBACK] No candidates returned"
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "[FALLBACK] No content parts returned"
+
+        text = parts[0].get("text")
+        if not text:
+            return "[FALLBACK] Gemini returned empty text"
+
+        return text  # SUCCESS
+
+    except Exception as e:
+        tech = f"Exception: {e}"
+        return f"[FALLBACK] {tech}"
 
 
 # ==========================
@@ -90,27 +166,23 @@ st.markdown(
 # Small logo + title
 logo_col, title_col = st.columns([1, 5])
 with logo_col:
-    # Local logo: put heart.png in same folder as app.py
-    local_logo = os.path.join(os.path.dirname(__file__), "heart.png")
-    if os.path.exists(local_logo):
-        st.image(local_logo, width=70)
-
+    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=70)
 with title_col:
     st.markdown("### 🩸 Blood Group Detection – Fusion CNN")
-    st.markdown(
-        "<p style='font-size:20px; font-weight:600;'>Right blood. Right time. Saves life.</p>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<p style='font-size:20px; font-weight:600;'>Right blood. Right time. Saves life.</p>", unsafe_allow_html=True)
     st.caption("ResNet50 + LeNet based model with AI assistant for explanations.")
+    
 
 st.markdown("---")
 
 
 # ==========================
-# MODEL SETUP (OFFLINE)
+# MODEL SETUP
 # ==========================
 BASE_DIR = os.path.dirname(__file__)
 MODEL_PATH = os.path.join(BASE_DIR, "model_blood_group_detection_fusion.h5")
+GDRIVE_FILE_ID = "1MUeTJdagltmtkKV6ttdBzOcXsB3RiazU"
+MODEL_URL = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
 
 HISTORY_CSV = os.path.join(BASE_DIR, "prediction_history.csv")
 CLASS_LABELS = ["A+", "A-", "AB+", "AB-", "B+", "B-", "O+", "O-"]
@@ -137,14 +209,9 @@ def squeeze_excite_block(input_tensor, ratio=16):
 
 @st.cache_resource
 def load_model():
-    # Offline: model must already exist locally
     if not os.path.exists(MODEL_PATH):
-        st.error(
-            "Model file not found.\n\n"
-            "Please place 'model_blood_group_detection_fusion.h5' in the "
-            "same folder as app.py, then restart the app."
-        )
-        st.stop()
+        with st.spinner("Downloading model (first time only)..."):
+            gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
     return tf.keras.models.load_model(
         MODEL_PATH, custom_objects={"squeeze_excite_block": squeeze_excite_block}
     )
@@ -186,9 +253,11 @@ def load_history():
 st.session_state.setdefault("chat", [])
 st.session_state.setdefault("last_report", None)
 
-
 # ==========================
-# ASK BUTTON CALLBACK (OFFLINE)
+# ASK BUTTON CALLBACK
+# ==========================
+# ==========================
+# ASK BUTTON CALLBACK
 # ==========================
 def handle_ask():
     question = st.session_state.get("question_input", "").strip()
@@ -245,20 +314,53 @@ def handle_ask():
         st.session_state["question_input"] = ""
         return
 
-    # 3️⃣ OFFLINE Q&A ONLY
-    local_answer = find_local_answer(question)
-    if local_answer:
-        reply = local_answer
-    else:
-        reply = (
-            "I am running in offline mode and couldn't find this question in the "
-            "saved Q&A.\n\n"
-            "Please try rephrasing or ask something about blood groups, Rh factor, "
-            "fingerprint-based prediction, or this application."
-        )
+    # 3️⃣ NORMAL AI FLOW (your existing logic)
+    with st.spinner("Thinking..."):
+        answers: List[str] = []
 
+        if _MULTI_LLMS_AVAILABLE and selected:
+            try:
+                # If user didn't select anything, default to Saved Q&A
+                if not selected:
+                    selected = ["Saved Q&A"]
+                answers = run_sources(question, selected, gemini_model)
+            except Exception as e:
+                answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
+
+        # fallback behavior if run_sources isn't available or returned nothing
+        if (not _MULTI_LLMS_AVAILABLE) or not answers:
+            local_answer = find_local_answer(question)
+            if local_answer:
+                answers = [local_answer]
+            else:
+                # use direct Gemini call as a final fallback (single call)
+                gemini_answer = ask_gemini(question)
+
+                if gemini_answer.startswith("[FALLBACK]"):
+                    # Extract the technical reason
+                    tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
+
+                    reply = (
+                        "I couldn't find a confident answer for that right now.\n\n"
+                        "🔹 Try rephrasing your question\n"
+                        "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
+                    )
+                else:
+                    reply = gemini_answer
+
+                # set answers to a single reply to keep downstream code consistent
+                answers = [reply]
+
+        # build a single reply string (join multiple responses)
+        reply = "\n\n".join(answers)
+
+    # add bot reply to history
     st.session_state["chat"].append({"role": "bot", "text": reply})
+
+    # clear textbox
     st.session_state["question_input"] = ""
+
+
 
 
 # ==========================
@@ -357,8 +459,8 @@ with tab_history:
 
 # ---------- Chat Tab ----------
 with tab_chat:
-    st.markdown("### Chat with AI (offline Q&A)")
-    st.caption("Uses saved Q&A from qa_data.json (no internet required).")
+    st.markdown("### Chat with AI about blood groups or your results")
+    st.caption("Example: *What is the difference between A+ and A- blood?*")
 
     # Show chat history (bubbles)
     st.markdown('<div class="chat-box">', unsafe_allow_html=True)
@@ -367,5 +469,15 @@ with tab_chat:
         st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # Text input with key stored in session_state
     st.text_input("Ask AI:", key="question_input")
+
+    # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
+
+
+
+
+
+
