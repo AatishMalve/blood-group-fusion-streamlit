@@ -5,32 +5,17 @@ from datetime import datetime
 import numpy as np
 import pytz
 import streamlit as st
-import requests
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras.applications.resnet import preprocess_input
 from tensorflow.keras.layers import Dense, Multiply
-import gdown
 import json
 import re
 from difflib import get_close_matches
-from typing import List, Optional
+from typing import List
 
 # ==========================
-# OPTIONAL: Multi LLMs import
-# ==========================
-try:
-    from MultiLLMsV3 import run_sources
-    _MULTI_LLMS_AVAILABLE = True
-except Exception:
-    _MULTI_LLMS_AVAILABLE = False
-
-# If you use these somewhere else, declare placeholders
-selected: Optional[List[str]] = []
-gemini_model = None
-
-# ==========================
-# Load predefined Q&A (JSON)
+# LOCAL Q&A LOADING (NO INTERNET)
 # ==========================
 
 def clean_text(t: str) -> str:
@@ -61,72 +46,10 @@ def find_local_answer(question: str):
 
 
 # ==========================
-# GEMINI API CONFIG
-# ==========================
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyASOP1QwcY1HDCsz4En6a0z6cJXRkDHMTQ")
-
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-1.5-flash-latest:generateContent"
-)
-
-
-def ask_gemini(question: str) -> str:
-    """Call Gemini API and always return user-friendly fallback on failure."""
-    if not GOOGLE_API_KEY:
-        tech = "API key missing"
-        return f"[FALLBACK] {tech}"
-
-    headers = {"Content-Type": "application/json", "x-goog-api-key": GOOGLE_API_KEY}
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": (
-                            "You are an AI assistant helping with blood groups, Rh factor, "
-                            "fingerprint-based prediction, and medical explanations.\n"
-                            "Explain simply.\n\n"
-                            f"Question: {question}"
-                        )
-                    }
-                ]
-            }
-        ]
-    }
-
-    try:
-        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
-        if resp.status_code != 200:
-            tech = f"HTTP {resp.status_code}: {resp.text}"
-            return f"[FALLBACK] {tech}"
-
-        data = resp.json()
-        candidates = data.get("candidates", [])
-        if not candidates:
-            return "[FALLBACK] No candidates returned"
-
-        parts = candidates[0].get("content", {}).get("parts", [])
-        if not parts:
-            return "[FALLBACK] No content parts returned"
-
-        text = parts[0].get("text")
-        if not text:
-            return "[FALLBACK] Gemini returned empty text"
-
-        return text
-
-    except Exception as e:
-        tech = f"Exception: {e}"
-        return f"[FALLBACK] {tech}"
-
-
-# ==========================
 # STREAMLIT PAGE STYLE
 # ==========================
 st.set_page_config(page_title="Blood Group Detection", page_icon="🩸", layout="wide")
 
-# Global CSS and theming
 st.markdown(
     """
 <style>
@@ -286,10 +209,10 @@ button[role="tab"][aria-selected="false"] {
     unsafe_allow_html=True,
 )
 
-# Hero header
+# Hero header (uses local emoji icon only)
 logo_col, title_col = st.columns([1, 5])
 with logo_col:
-    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=80)
+    st.markdown("<div style='font-size:60px;'>🩸</div>", unsafe_allow_html=True)
 
 with title_col:
     st.markdown(
@@ -304,7 +227,7 @@ with title_col:
             Right blood. Right time. Saves life.
         </p>
         <p style="font-size:0.9rem; color:#6b7280;">
-            ResNet50 + LeNet fusion model with an AI assistant for clinical-style explanations.
+            ResNet50 + LeNet fusion model with an offline AI assistant for explanations.
         </p>
         """,
         unsafe_allow_html=True,
@@ -314,12 +237,10 @@ st.markdown("---")
 
 
 # ==========================
-# MODEL SETUP
+# MODEL SETUP (NO DOWNLOAD)
 # ==========================
 BASE_DIR = os.path.dirname(__file__)
 MODEL_PATH = os.path.join(BASE_DIR, "model_blood_group_detection_fusion.h5")
-GDRIVE_FILE_ID = "1MUeTJdagltmtkKV6ttdBzOcXsB3RiazU"
-MODEL_URL = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
 
 HISTORY_CSV = os.path.join(BASE_DIR, "prediction_history.csv")
 CLASS_LABELS = ["A+", "A-", "AB+", "AB-", "B+", "B-", "O+", "O-"]
@@ -347,8 +268,11 @@ def squeeze_excite_block(input_tensor, ratio=16):
 @st.cache_resource
 def load_model():
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model (first time only)..."):
-            gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        st.error(
+            "Model file not found. Please place 'model_blood_group_detection_fusion.h5' "
+            "in the same folder as app.py."
+        )
+        st.stop()
     return tf.keras.models.load_model(
         MODEL_PATH, custom_objects={"squeeze_excite_block": squeeze_excite_block}
     )
@@ -390,8 +314,9 @@ def load_history():
 st.session_state.setdefault("chat", [])
 st.session_state.setdefault("last_report", None)
 
+
 # ==========================
-# ASK BUTTON CALLBACK
+# OFFLINE CHAT CALLBACK
 # ==========================
 def handle_ask():
     question = st.session_state.get("question_input", "").strip()
@@ -403,7 +328,7 @@ def handle_ask():
     st.session_state["chat"].append({"role": "user", "text": question})
     q_lower = question.lower()
 
-    # 1) show all predictions / history
+    # show all predictions / history
     if ("show" in q_lower and "prediction" in q_lower and "all" in q_lower) or \
        ("show" in q_lower and "history" in q_lower) or \
        ("list" in q_lower and "prediction" in q_lower):
@@ -411,14 +336,15 @@ def handle_ask():
         try:
             history = load_history()
             if history:
-                reply = "📜 **All Previous Predictions:**\n\n"
+                reply_lines = ["📜 All Previous Predictions:\n"]
                 for row in history:
-                    reply += (
+                    reply_lines.append(
                         f"👤 {row['user']} | 🕒 {row['timestamp']} | "
-                        f"🩸 {row['prediction']} | 🎯 {row['confidence']}%\n"
+                        f"🩸 {row['prediction']} | 🎯 {row['confidence']}%"
                     )
+                reply = "\n".join(reply_lines)
             else:
-                reply = "Sorry, no earlier predictions, please predict first."
+                reply = "No earlier predictions found, please make a prediction first."
         except Exception:
             reply = "Error retrieving history."
 
@@ -426,7 +352,7 @@ def handle_ask():
         st.session_state["question_input"] = ""
         return
 
-    # 2) show only last prediction
+    # show last prediction
     if ("show" in q_lower and "prediction" in q_lower and
         ("earlier" in q_lower or "last" in q_lower or "recent" in q_lower)):
 
@@ -440,45 +366,25 @@ def handle_ask():
                 f"Confidence: {last['confidence']}%\n"
             )
         else:
-            reply = "Sorry, no earlier predictions, please predict first."
+            reply = "No earlier predictions found, please make a prediction first."
 
         st.session_state["chat"].append({"role": "bot", "text": reply})
         st.session_state["question_input"] = ""
         return
 
-    # 3) Normal AI flow
-    with st.spinner("Thinking..."):
-        answers: List[str] = []
-
-        if _MULTI_LLMS_AVAILABLE and selected:
-            try:
-                if not selected:
-                    selected = ["Saved Q&A"]
-                answers = run_sources(question, selected, gemini_model)
-            except Exception as e:
-                answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
-
-        if (not _MULTI_LLMS_AVAILABLE) or not answers:
-            local_answer = find_local_answer(question)
-            if local_answer:
-                answers = [local_answer]
-            else:
-                gemini_answer = ask_gemini(question)
-
-                if gemini_answer.startswith("[FALLBACK]"):
-                    tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
-                    reply = (
-                        "I couldn't find a confident answer for that right now.\n\n"
-                        "🔹 Try rephrasing your question\n"
-                        "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
-                        f"(Technical note: {tech_note})"
-                    )
-                else:
-                    reply = gemini_answer
-
-                answers = [reply]
-
-        reply = "\n\n".join(answers)
+    # normal Q&A from local JSON
+    local_answer = find_local_answer(question)
+    if local_answer:
+        reply = local_answer
+    else:
+        reply = (
+            "Offline assistant could not find an exact answer.\n\n"
+            "Try asking about:\n"
+            "• Blood groups and Rh factor\n"
+            "• Meaning of your prediction result\n"
+            "• Basic transfusion rules\n\n"
+            "You can also add more Q&A to 'qa_data.json' for richer offline explanations."
+        )
 
     st.session_state["chat"].append({"role": "bot", "text": reply})
     st.session_state["question_input"] = ""
@@ -598,7 +504,6 @@ with tab_predict:
             use_container_width=True,
         )
 
-
 # ---------- History Tab ----------
 with tab_history:
     st.markdown("### 📜 Previous predictions")
@@ -610,11 +515,10 @@ with tab_history:
         st.dataframe(history, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ---------- Chat Tab ----------
 with tab_chat:
-    st.markdown("### 💬 AI chat")
-    st.caption("Ask about blood groups, Rh factor, or your last prediction.")
+    st.markdown("### 💬 AI chat (offline)")
+    st.caption("Ask about blood groups, Rh factor or your prediction result. Answers use local 'qa_data.json'.")
     st.markdown('<div class="app-card">', unsafe_allow_html=True)
 
     # Show chat history (bubbles)
@@ -631,4 +535,3 @@ with tab_chat:
     st.button("Ask", use_container_width=True, on_click=handle_ask)
 
     st.markdown('</div>', unsafe_allow_html=True)
-
