@@ -16,12 +16,18 @@ import re
 from difflib import get_close_matches
 from typing import List, Optional
 
-# NEW: import orchestrator from uploaded module (must be in same folder)
+# ==========================
+# OPTIONAL: Multi LLMs import
+# ==========================
 try:
     from MultiLLMsV3 import run_sources
     _MULTI_LLMS_AVAILABLE = True
 except Exception:
     _MULTI_LLMS_AVAILABLE = False
+
+# If you use these somewhere else, declare placeholders
+selected: Optional[List[str]] = []
+gemini_model = None
 
 # ==========================
 # Load predefined Q&A (JSON)
@@ -34,7 +40,6 @@ def clean_text(t: str) -> str:
 try:
     with open("qa_data.json", "r", encoding="utf-8") as f:
         raw_data = json.load(f)
-        # normalize keys to cleaned form
         QA_DATA = {clean_text(k): v for k, v in raw_data.items()}
 except (FileNotFoundError, json.JSONDecodeError):
     QA_DATA = {}
@@ -44,13 +49,11 @@ def find_local_answer(question: str):
     """Return answer from local JSON if exact or slightly similar; else None."""
     q = clean_text(question)
 
-    # Exact match
     if q in QA_DATA:
         return QA_DATA[q]
 
-    # Fuzzy close match – similar but not too loose
     keys = list(QA_DATA.keys())
-    matches = get_close_matches(q, keys, n=1, cutoff=0.7)  # 0.7 ~ “little bit similar”
+    matches = get_close_matches(q, keys, n=1, cutoff=0.7)
     if matches:
         return QA_DATA[matches[0]]
 
@@ -60,7 +63,6 @@ def find_local_answer(question: str):
 # ==========================
 # GEMINI API CONFIG
 # ==========================
-# Prefer reading key from environment; fallback to any hard-coded value present
 GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyASOP1QwcY1HDCsz4En6a0z6cJXRkDHMTQ")
 
 GEMINI_URL = (
@@ -70,8 +72,7 @@ GEMINI_URL = (
 
 
 def ask_gemini(question: str) -> str:
-    """Call Gemini API and always return user-friendly fallback on failure.
-    Successful responses return raw text. Failures return strings starting with '[FALLBACK] <reason>'."""
+    """Call Gemini API and always return user-friendly fallback on failure."""
     if not GOOGLE_API_KEY:
         tech = "API key missing"
         return f"[FALLBACK] {tech}"
@@ -96,14 +97,11 @@ def ask_gemini(question: str) -> str:
 
     try:
         resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=20)
-
-        # If HTTP not OK → return fallback with reason
         if resp.status_code != 200:
             tech = f"HTTP {resp.status_code}: {resp.text}"
             return f"[FALLBACK] {tech}"
 
         data = resp.json()
-
         candidates = data.get("candidates", [])
         if not candidates:
             return "[FALLBACK] No candidates returned"
@@ -116,7 +114,7 @@ def ask_gemini(question: str) -> str:
         if not text:
             return "[FALLBACK] Gemini returned empty text"
 
-        return text  # SUCCESS
+        return text
 
     except Exception as e:
         tech = f"Exception: {e}"
@@ -128,50 +126,189 @@ def ask_gemini(question: str) -> str:
 # ==========================
 st.set_page_config(page_title="Blood Group Detection", page_icon="🩸", layout="wide")
 
+# Global CSS and theming
 st.markdown(
     """
 <style>
-.report-card {
-    background-color: #ffffff;
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
-    border: 1px solid #ececec;
+
+/* Page background */
+.stApp {
+    background: radial-gradient(circle at top left, #ffe3ec 0, #ffffff 40%, #f3f6ff 100%);
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+/* Hide default Streamlit header/footer */
+header[data-testid="stHeader"] {background: rgba(0,0,0,0); }
+footer {visibility: hidden;}
+
+/* Section titles */
+h2, h3, h4 {
+    font-weight: 700;
+    color: #1f2933;
+}
+
+/* Generic card */
+.app-card {
+    background: #ffffff;
+    padding: 1.2rem 1.5rem;
+    border-radius: 18px;
+    border: 1px solid #edf0ff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* Prediction report card */
+.report-card {
+    background: linear-gradient(135deg, #ffe5ec, #ffffff);
+    padding: 1.3rem 1.5rem;
+    border-radius: 18px;
+    box-shadow: 0 14px 35px rgba(220, 38, 38, 0.20);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+/* Tabs */
+[data-baseweb="tab-list"] {
+    gap: 0.4rem;
+}
+button[role="tab"] {
+    border-radius: 999px !important;
+    padding: 0.45rem 1.4rem !important;
+    font-weight: 600 !important;
+    border: 1px solid transparent !important;
+}
+button[role="tab"][aria-selected="true"] {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+}
+button[role="tab"][aria-selected="false"] {
+    background: #ffffff !important;
+    color: #4b5563 !important;
+    border-color: #e5e7eb !important;
+}
+
+/* Inputs as cards */
+.block-container label {
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Primary buttons */
+.stButton>button {
+    width: 100%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: white;
+    font-weight: 600;
+    border: none;
+    padding: 0.55rem 0;
+    box-shadow: 0 10px 25px rgba(239,68,68,0.45);
+}
+.stButton>button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 40px rgba(239,68,68,0.55);
+}
+
+/* File uploader styling */
+[data-testid="stFileUploader"] {
+    border-radius: 16px;
+    padding: 0.6rem 0.8rem 1.2rem 0.8rem;
+    background: #f9fafb;
+    border: 1px dashed #e5e7eb;
+}
+
+/* Chat bubbles */
 .chat-bubble-user {
-    background-color: #d8ebff;
-    padding: 8px 12px;
+    background: #fee2e2;
+    padding: 10px 14px;
     border-radius: 14px;
     margin-bottom: 6px;
     max-width: 80%;
     margin-left: auto;
+    color: #111827;
 }
 .chat-bubble-bot {
-    background-color: #ffffff;
-    padding: 8px 12px;
+    background: #ffffff;
+    padding: 10px 14px;
     border-radius: 14px;
     margin-bottom: 6px;
     max-width: 80%;
-    border: 1px solid #e4e4ef;
+    border: 1px solid #e5e7eb;
 }
 .chat-box {
     max-height: 350px;
     overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+/* Hero subtitle badge */
+.hero-subtitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(248, 250, 252, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    font-size: 0.78rem;
+    color: #4b5563;
+}
+
+/* File details list */
+.file-details {
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+/* History table */
+[data-testid="stDataFrame"] {
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 26px rgba(15,23,42,0.06);
+}
+
+/* Download button */
+.stDownloadButton>button {
+    border-radius: 999px;
+    background: #111827;
+    color: #f9fafb;
+    font-weight: 600;
+}
+
+/* Info box override for Tips */
+.app-tip {
+    background: #f0f9ff;
+    border-radius: 14px;
+    padding: 0.9rem 1.0rem;
+    border: 1px solid #bae6fd;
+    font-size: 0.9rem;
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Small logo + title
+# Hero header
 logo_col, title_col = st.columns([1, 5])
 with logo_col:
-    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=70)
+    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=80)
+
 with title_col:
-    st.markdown("### 🩸 Blood Group Detection – Fusion CNN")
-    st.markdown("<p style='font-size:20px; font-weight:600;'>Right blood. Right time. Saves life.</p>", unsafe_allow_html=True)
-    st.caption("ResNet50 + LeNet based model with AI assistant for explanations.")
-    
+    st.markdown(
+        """
+        <div style="margin-bottom:0.2rem;">
+            <span class="hero-subtitle">
+                ⚕️ Smart Hematology Assistant
+            </span>
+        </div>
+        <h2 style="margin-bottom:0.2rem;">Blood Group Detection – <span style="color:#ef4444;">Fusion CNN</span></h2>
+        <p style="font-size:1.05rem; color:#4b5563; margin-bottom:0.2rem;">
+            Right blood. Right time. Saves life.
+        </p>
+        <p style="font-size:0.9rem; color:#6b7280;">
+            ResNet50 + LeNet fusion model with an AI assistant for clinical-style explanations.
+        </p>
+        """,
+        unsafe_allow_html=True,
+    )
 
 st.markdown("---")
 
@@ -256,9 +393,6 @@ st.session_state.setdefault("last_report", None)
 # ==========================
 # ASK BUTTON CALLBACK
 # ==========================
-# ==========================
-# ASK BUTTON CALLBACK
-# ==========================
 def handle_ask():
     question = st.session_state.get("question_input", "").strip()
 
@@ -266,12 +400,10 @@ def handle_ask():
         st.warning("Enter a question first.")
         return
 
-    # add user message to history
     st.session_state["chat"].append({"role": "user", "text": question})
-
     q_lower = question.lower()
 
-    # 1️⃣ SHOW ALL PREDICTIONS / HISTORY
+    # 1) show all predictions / history
     if ("show" in q_lower and "prediction" in q_lower and "all" in q_lower) or \
        ("show" in q_lower and "history" in q_lower) or \
        ("list" in q_lower and "prediction" in q_lower):
@@ -294,7 +426,7 @@ def handle_ask():
         st.session_state["question_input"] = ""
         return
 
-    # 2️⃣ SHOW ONLY LAST / EARLIER PREDICTION
+    # 2) show only last prediction
     if ("show" in q_lower and "prediction" in q_lower and
         ("earlier" in q_lower or "last" in q_lower or "recent" in q_lower)):
 
@@ -314,53 +446,42 @@ def handle_ask():
         st.session_state["question_input"] = ""
         return
 
-    # 3️⃣ NORMAL AI FLOW (your existing logic)
+    # 3) Normal AI flow
     with st.spinner("Thinking..."):
         answers: List[str] = []
 
         if _MULTI_LLMS_AVAILABLE and selected:
             try:
-                # If user didn't select anything, default to Saved Q&A
                 if not selected:
                     selected = ["Saved Q&A"]
                 answers = run_sources(question, selected, gemini_model)
             except Exception as e:
                 answers = [f"[MultiLLMs] Error calling run_sources: {e}"]
 
-        # fallback behavior if run_sources isn't available or returned nothing
         if (not _MULTI_LLMS_AVAILABLE) or not answers:
             local_answer = find_local_answer(question)
             if local_answer:
                 answers = [local_answer]
             else:
-                # use direct Gemini call as a final fallback (single call)
                 gemini_answer = ask_gemini(question)
 
                 if gemini_answer.startswith("[FALLBACK]"):
-                    # Extract the technical reason
                     tech_note = gemini_answer.replace("[FALLBACK]", "").strip()
-
                     reply = (
                         "I couldn't find a confident answer for that right now.\n\n"
                         "🔹 Try rephrasing your question\n"
                         "🔹 Or ask something related to blood groups, Rh factor, or fingerprint-based prediction\n\n"
+                        f"(Technical note: {tech_note})"
                     )
                 else:
                     reply = gemini_answer
 
-                # set answers to a single reply to keep downstream code consistent
                 answers = [reply]
 
-        # build a single reply string (join multiple responses)
         reply = "\n\n".join(answers)
 
-    # add bot reply to history
     st.session_state["chat"].append({"role": "bot", "text": reply})
-
-    # clear textbox
     st.session_state["question_input"] = ""
-
-
 
 
 # ==========================
@@ -370,29 +491,60 @@ tab_predict, tab_history, tab_chat = st.tabs(["🔍 Prediction", "📜 History",
 
 # ---------- Prediction Tab ----------
 with tab_predict:
-    st.markdown("### Upload image and predict blood group")
+    st.markdown("### 🔍 Upload image and predict blood group")
 
-    col_left, col_right = st.columns([2, 1])
-    with col_left:
-        username_input = st.text_input("User Name", "")
-        uploaded_file = st.file_uploader(
-            "Upload blood smear image", type=["jpg", "jpeg", "png", "bmp"]
-        )
-    with col_right:
-        st.info("Tips:\n- Use clear blood smear images\n- Supported: JPG, JPEG, PNG, BMP")
+    # Input card
+    with st.container():
+        st.markdown('<div class="app-card">', unsafe_allow_html=True)
+        col_left, col_right = st.columns([2.2, 1.1])
+
+        with col_left:
+            username_input = st.text_input("User Name", "", placeholder="Enter patient / user name")
+            uploaded_file = st.file_uploader(
+                "Upload blood smear image",
+                type=["jpg", "jpeg", "png", "bmp"]
+            )
+
+        with col_right:
+            st.markdown(
+                """
+                <div class="app-tip">
+                    <b>Tips for best results</b><br/>
+                    • Use clear, focused smear images<br/>
+                    • Avoid glare and heavy artifacts<br/>
+                    • Supported formats: JPG, JPEG, PNG, BMP
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     if uploaded_file:
-        c1, c2 = st.columns([3, 1])
+        st.markdown("")
+        c1, c2 = st.columns([2.2, 1.0])
         with c1:
+            st.markdown('<div class="app-card">', unsafe_allow_html=True)
             img = Image.open(uploaded_file)
-            st.image(img, caption="Uploaded Image", width=350)
-        with c2:
-            st.write("**File details**")
-            st.write(f"Name: `{uploaded_file.name}`")
-            st.write(f"Size: {round(len(uploaded_file.getvalue()) / 1024, 2)} KB")
-            st.write(f"Type: {uploaded_file.type}")
+            st.image(img, caption="Preview of uploaded smear image", use_column_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.button("Predict", use_container_width=True):
+        with c2:
+            st.markdown('<div class="app-card">', unsafe_allow_html=True)
+            st.markdown("**File details**", unsafe_allow_html=True)
+            st.markdown(
+                f"""
+                <div class="file-details">
+                    • Name: <code>{uploaded_file.name}</code><br/>
+                    • Size: {round(len(uploaded_file.getvalue()) / 1024, 2)} KB<br/>
+                    • Type: {uploaded_file.type}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        if st.button("🔬 Predict blood group", use_container_width=True):
             with st.spinner("Detecting blood group..."):
                 res_in = preprocess_resnet(img)
                 len_in = preprocess_lenet(img)
@@ -427,57 +579,10 @@ with tab_predict:
                 unsafe_allow_html=True,
             )
 
-    # Simple text report download
     if st.session_state["last_report"]:
         rep = st.session_state["last_report"]
         report_text = (
             "BloodPrint Prediction Report\n"
             "----------------------------\n"
             f"User: {rep['user']}\n"
-            f"Date/Time: {rep['timestamp']}\n"
-            f"Prediction: {rep['label']}\n"
-            f"Confidence: {rep['confidence']}%\n"
-        )
-        st.download_button(
-            "📄 Download Report (TXT)",
-            report_text.encode("utf-8"),
-            "bloodprint_report.txt",
-            "text/plain",
-            use_container_width=True,
-        )
-
-
-# ---------- History Tab ----------
-with tab_history:
-    st.markdown("### Previous Predictions")
-    history = load_history()
-    if not history:
-        st.info("No previous predictions available.")
-    else:
-        st.dataframe(history, use_container_width=True)
-
-
-# ---------- Chat Tab ----------
-with tab_chat:
-    st.markdown("### Chat with AI about blood groups or your results")
-    st.caption("Example: *What is the difference between A+ and A- blood?*")
-
-    # Show chat history (bubbles)
-    st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-    for msg in st.session_state["chat"]:
-        cls = "chat-bubble-user" if msg["role"] == "user" else "chat-bubble-bot"
-        st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Text input with key stored in session_state
-    st.text_input("Ask AI:", key="question_input")
-
-    # Button uses callback, which will also clear the textbox
-    st.button("Ask", use_container_width=True, on_click=handle_ask)
-
-
-
-
-
-
-
+            f"Date/Time: {
