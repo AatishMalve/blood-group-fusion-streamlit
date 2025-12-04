@@ -579,10 +579,56 @@ with tab_predict:
                 unsafe_allow_html=True,
             )
 
+    # Simple text report download
     if st.session_state["last_report"]:
         rep = st.session_state["last_report"]
         report_text = (
             "BloodPrint Prediction Report\n"
             "----------------------------\n"
             f"User: {rep['user']}\n"
-            f"Date/Time: {
+            f"Date/Time: {rep['timestamp']}\n"
+            f"Prediction: {rep['label']}\n"
+            f"Confidence: {rep['confidence']}%\n"
+        )
+        st.download_button(
+            "📄 Download Report (TXT)",
+            report_text.encode("utf-8"),
+            "bloodprint_report.txt",
+            "text/plain",
+            use_container_width=True,
+        )
+
+
+# ---------- History Tab ----------
+with tab_history:
+    st.markdown("### 📜 Previous predictions")
+    st.markdown('<div class="app-card">', unsafe_allow_html=True)
+    history = load_history()
+    if not history:
+        st.info("No previous predictions available.")
+    else:
+        st.dataframe(history, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ---------- Chat Tab ----------
+with tab_chat:
+    st.markdown("### 💬 AI chat")
+    st.caption("Ask about blood groups, Rh factor, or your last prediction.")
+    st.markdown('<div class="app-card">', unsafe_allow_html=True)
+
+    # Show chat history (bubbles)
+    st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+    for msg in st.session_state["chat"]:
+        cls = "chat-bubble-user" if msg["role"] == "user" else "chat-bubble-bot"
+        st.markdown(f'<div class="{cls}">{msg["text"]}</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Text input
+    st.text_input("Ask AI:", key="question_input", placeholder="Type your question here…")
+
+    # Button uses callback
+    st.button("Ask", use_container_width=True, on_click=handle_ask)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
