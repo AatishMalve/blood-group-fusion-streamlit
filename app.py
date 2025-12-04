@@ -169,8 +169,9 @@ with logo_col:
     st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=70)
 with title_col:
     st.markdown("### 🩸 Blood Group Detection – Fusion CNN")
+    st.markdown("<p style='font-size:20px; font-weight:600;'>Right blood. Right time. Saves life.</p>", unsafe_allow_html=True)
     st.caption("ResNet50 + LeNet based model with AI assistant for explanations.")
-    st.caption("Right blood. Right time. Saves life.")
+    
 
 st.markdown("---")
 
@@ -473,6 +474,7 @@ with tab_chat:
 
     # Button uses callback, which will also clear the textbox
     st.button("Ask", use_container_width=True, on_click=handle_ask)
+
 
 
 
